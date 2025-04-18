@@ -18,7 +18,7 @@ def convert_wiki_dataset(tokenizer, seq_len = 256):
     return dataset
 
 def convert_cnn_dataset(tokenizer, seq_len = 256):
-    dataset = load_dataset("cnn_dailymail", "1.0.0", split="test[0:2000]")
+    dataset = load_dataset("cnn_dailymail", "1.0.0", split="test[0:200]")
     def tokenize_function(examples):
             return tokenizer(examples["article"], return_tensors='pt',max_length=seq_len,padding=True,truncation=True)
     dataset = dataset.map(tokenize_function, batched=True, remove_columns=['article'])

@@ -135,6 +135,11 @@ def cuda_graph_for_residual(device="cuda:0", dtype=torch.float16, dim=32000, n_w
     
     return run
 
+def graph_for_residual(dtype=torch.float16, dim=32000):
+    def run(p, q):
+        return get_residual(p, q)
+    return run
+
 def cuda_graph_for_sampling_without_replacement(
                 device="cuda:0", dtype=torch.float16, 
                 dim=32000, max_length=384, 
@@ -210,6 +215,11 @@ def cuda_graph_for_sampling_argmax(
     
     return run
 
+def graph_for_sampling_argmax(num_samples = 16):
+    def run(draft_logits):
+        position = sampling_argmax(draft_logits, num_samples)
+        return position
+    return run
 
 def cuda_graph_for_sampling_with_replacement(
                 device="cuda:0", dtype=torch.float16, 

@@ -194,6 +194,17 @@ class GraphInferenceEngine:
                 )
         self.engine.clear_kv()
     @torch.inference_mode()
+    def initialize_graph(self, decoding_seqlens :List[int], n_warmups=3):
+        gc.collect()
+        for decoding_seqlen in decoding_seqlens:
+            if decoding_seqlen not in self.callables and decoding_seqlen !=0:
+                self.callables[decoding_seqlen] = \
+                    lambda input_ids, storage_ids, position_ids, attn_mask: (
+                        self.engine.model_run(input_ids=input_ids,
+                                              storage_ids=storage_ids,
+                                              position_ids=position_ids,
+                                              attention_mask=attn_mask))
+    @torch.inference_mode()
     def graph_inference(self,
             input_ids: torch.LongTensor, 
             storage_ids :torch.LongTensor,
