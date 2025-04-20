@@ -58,11 +58,11 @@ def simulation_fast(target_model : GraphInferenceEngineTG, draft_model: GraphInf
     
     with torch.no_grad():
         for step, batch in tqdm(enumerate(dataloader), total=num_eval_steps):
-            
+            # input_ids and labels are the same here. labels are typically used for training target
             input_ids = batch['input_ids'][..., :args.S]
             labels = batch['labels'][..., :args.S]
             terminate = False
-            if labels[0][-1] == -100: terminate = True
+            if labels[0][-1] == -100: terminate = True  # -100 is ignore_index in DataCollatorForLanguageModeling. Not necessary here.
             draft_kv_len = 0
             target_kv_len = 0
             attn_mask.fill_(torch.finfo(dtype).min)
@@ -82,7 +82,7 @@ def simulation_fast(target_model : GraphInferenceEngineTG, draft_model: GraphInf
             t1 = time.time()
             while input_ids.shape[1] < args.S + 128 and terminate == False:
                 spectree.construct_grow_map()
-                
+
                 valid_tokens, draft_kv_len, target_kv_len, terminate = spectree.verify()
                 
                 num_decoding_steps += (valid_tokens.shape[0] - input_ids.shape[1])
@@ -301,4 +301,4 @@ elif args.Mode == 'baseline':
     simulation_baseline(target_model=target_model, dataloader=dataloader, T=args.T, top_p=args.P, max_length=args.M)
 elif args.Mode == 'greedy':
     simulation_fast(target_model=target_model, draft_model=draft_model, dataloader=dataloader, T=args.T, top_p=args.P,
-                                     max_length=args.M, residual_graph = residual_graph, grow_map = grow_map, sampling_callables=sampling_callables, sample_gather_indices = sample_gather_indices)
+                                     max_length=args.M, residual_graph = None, grow_map = grow_map, sampling_callables=sampling_callables, sample_gather_indices = sample_gather_indices)

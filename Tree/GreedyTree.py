@@ -53,7 +53,8 @@ class GreedyTree(Tree):
         self.full_attn_mask[self.max_length - self.tree_size + 1: self.max_length, self.max_length - self.tree_size + 1: self.max_length] = tree_mask[1:, 1:]
 
 
-        total_nodes = len(prefix) + self.tree_size - 1
+        total_nodes = len(prefix) + self.tree_size - 1 # exclude the root, because root is already prefilled
+        # kv cache is pre-allocated, so the number of columns in attn_mask should always be max_length
         self.attn_mask = self.full_attn_mask[self.max_length - total_nodes: 2 * self.max_length - total_nodes, self.max_length - total_nodes: 2 * self.max_length - total_nodes]
         self.ground_truth_len = len(prefix)
         
@@ -63,6 +64,7 @@ class GreedyTree(Tree):
         self.depth = self.grow_map["depth"][1:].to(self.device)
         
         self.draft_logits = torch.zeros((self.max_length, vocab_size), dtype=self.dtype).to(self.device)
+        # prefill
         if draft_kv_len == 0:
             draft_model_outputs = self.draft_model_engine.inference(input_ids=self.tokens[:self.num_nodes].unsqueeze(0), 
                                 storage_ids=self.storage_ids[:self.num_nodes], 
@@ -111,7 +113,8 @@ class GreedyTree(Tree):
         end_pos = self.num_nodes
         attn_mask = self.attn_mask[self.num_nodes - total_branch: self.num_nodes]
         attn_mask = attn_mask[None, None, :, :]
-        
+
+        # difference between graph_inference and inference: graph_inference looks at cached computation graphs
         draft_model_outputs = self.draft_model_engine.graph_inference(
             input_ids = self.tokens[self.draft_kv_len: self.num_nodes].unsqueeze(0),
             position_ids = self.position_ids[start_pos : end_pos].unsqueeze(0),
