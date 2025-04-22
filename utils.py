@@ -1,6 +1,24 @@
 import torch
 import dataclasses
 from torch.nn.functional import softmax
+from typing import List
+
+
+def _merge_lists(a: List, b: List) -> List:
+    # merge to descending Lists of length n into one descending list of length n
+    # with the largest n elements
+    ptr_a = ptr_b = ptr = 0
+    output = [a[0]] * (len(a))
+    while ptr_a < len(a) and ptr_b < len(b):
+        if a[ptr_a] >= b[ptr_b]:
+            output[ptr] = a[ptr_a]
+            ptr_a += 1
+            ptr += 1
+        else:
+            output[ptr] = b[ptr_b]
+            ptr_b += 1
+            ptr += 1
+    return output
 
 def get_residual(p: torch.Tensor, q:torch.Tensor):
     residual = (p - q).relu_()
