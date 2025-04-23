@@ -1,9 +1,5 @@
 import torch
-
-from .Tree import Tree
-import time
 from Engine.Engine import GraphInferenceEngine, GraphInferenceEngineTG
-from utils import ChildrenAccept
 from utils import _make_causal_mask
 from utils import _merge_lists
 import numpy as np
@@ -54,21 +50,21 @@ class OPTTree:
             input_ids=self.tokens[:self.num_nodes].unsqueeze(0),
             storage_ids=self.storage_ids[:self.num_nodes],
             position_ids=self.position_ids[:self.num_nodes].unsqueeze(0),
-            attn_mask=self.attn_mask[:self.num_nodes][None, None, ...]
+            attn_mask=self.attn_mask[None, None, :self.num_nodes]
         ) # (1, num_nodes, vocab_size)
 
-        probs, tokens = self.sampling_callables[self.n_spec](draft_model_outputs[0])
+        probs, tokens = self.sampling_callables[self.n_spec](draft_model_outputs[0, -1])
         self.drafted_probs[0] = probs.cpu().numpy()
         self.drafted_tokens[0] = tokens.cpu().numpy()
-        self.selected_tokens = [(self.drafted_probs[0, j], (0, j)) for j in range(self.n_spec)]
+        self.selected_tokens = [(self.drafted_probs[0, j].item(), (0, j)) for j in range(self.n_spec)]
         self.E = sum([x[0] for x in self.selected_tokens])
 
     @torch.inference_mode()
     def draft_step(self, step: int) -> float:
         num_nodes = self.num_nodes + step
         tokens = torch.tensor([self.drafted_tokens[step - 1, 0]], device=self.device).long()
-        position_ids = torch.tensor([self.num_nodes - 1], device=self.device).long()
-        storage_ids = torch.tensor([self.num_nodes - 1], device=self.device).long()
+        position_ids = torch.tensor([num_nodes - 1], device=self.device).long()
+        storage_ids = torch.tensor([num_nodes - 1], device=self.device).long()
         attn_mask = self.attn_mask[num_nodes - 1: num_nodes]
 
         draft_model_outputs = self.draft_model_engine.graph_inference(
@@ -77,10 +73,10 @@ class OPTTree:
             position_ids=position_ids.unsqueeze(0),
             attn_mask=attn_mask[None, None, ...]
         )
-        new_probs, new_tokens = self.sampling_callables[self.n_spec](draft_model_outputs[0])
+        new_probs, new_tokens = self.sampling_callables[self.n_spec](draft_model_outputs[0, 0])
         self.drafted_probs[step] = new_probs.cpu().numpy() * self.drafted_probs[step - 1, 0]
         self.drafted_tokens[step] = new_tokens.cpu().numpy()
-        selected_tokens = [(self.drafted_probs[step, j], (step, j)) for j in range(self.n_spec)]
+        selected_tokens = [(self.drafted_probs[step, j].item(), (step, j)) for j in range(self.n_spec)]
         self.selected_tokens = _merge_lists(self.selected_tokens, selected_tokens)
         E = sum([x[0] for x in self.selected_tokens])
         delta = E - self.E
@@ -161,10 +157,15 @@ class OPTTree:
         target_tokens = target_model_outputs.argmax(dim=-1).cpu().numpy()
 
         # traverse the tree layer by layer
+        terminal = False
         target_token = target_tokens[0]
         accept_indices = []
         accept_tokens = []
         for layer in tree:
+            if target_token in [0, 2]:
+                # <unk> or </s>
+                terminal = True
+                break
             j, = np.where(spec_tokens[layer] == target_token)
             if len(j) == 0:
                 break
@@ -180,5 +181,26 @@ class OPTTree:
         # update
         self.tokens[self.num_nodes:self.num_nodes + len(accept_tokens)] = torch.tensor(accept_tokens, dtype=torch.long, device=self.device)
         self.position_ids[self.num_nodes:self.num_nodes + len(accept_tokens)] = torch.arange(self.num_nodes, self.num_nodes + len(accept_tokens), dtype=torch.long, device=self.device)
-
+        # consolidate caches
+        indices = np.zeros(self.num_nodes + len(accept_indices), dtype=np.int64)
+        indices[:self.num_nodes] = np.arange(self.num_nodes)
+        indices[self.num_nodes:] = np.array(accept_indices) + self.num_nodes
+        self.draft_model_engine.gather_kv(indices)
+        self.target_model_engine.gather_kv(indices)
         self.num_nodes += len(accept_tokens)
+
+        # prepare for the next draft
+        if not terminal:
+            draft_model_outputs = self.draft_model_engine.graph_inference(
+                input_ids=self.tokens[-1:].unsqueeze(0),
+                storage_ids=self.storage_ids[-1:],
+                position_ids=position_ids[-1:].unsqueeze(0),
+                attn_mask=self.attn_mask[None, None, self.num_nodes - 1:self.num_nodes]
+            )
+            probs, tokens = self.sampling_callables[self.n_spec](draft_model_outputs[0, 0])
+            self.drafted_probs[0] = probs.cpu().numpy()
+            self.drafted_tokens[0] = tokens.cpu().numpy()
+            self.selected_tokens = [(self.drafted_probs[0, j], (0, j)) for j in range(self.n_spec)]
+            self.E = sum([x[0] for x in self.selected_tokens])
+
+        return len(accept_tokens), terminal

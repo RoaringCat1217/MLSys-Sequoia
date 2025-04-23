@@ -9,7 +9,7 @@ def _merge_lists(a: List, b: List) -> List:
     # with the largest n elements
     ptr_a = ptr_b = ptr = 0
     output = [a[0]] * (len(a))
-    while ptr_a < len(a) and ptr_b < len(b):
+    while ptr < len(a):
         if a[ptr_a] >= b[ptr_b]:
             output[ptr] = a[ptr_a]
             ptr_a += 1
@@ -228,6 +228,13 @@ def cuda_graph_for_sampling_argmax(
     
     return run
 
+
+def graph_for_sampling_opttree(num_samples):
+    def run(draft_logits: torch.Tensor):
+        logits, tokens = draft_logits.topk(num_samples, largest=True, sorted=True)
+        probs = torch.nn.functional.softmax(logits)
+        return probs, tokens
+    return run
 
 def cuda_graph_for_sampling_with_replacement(
                 device="cuda:0", dtype=torch.float16, 
