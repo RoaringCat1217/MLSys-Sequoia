@@ -81,7 +81,7 @@ if args.offloading:
 else:
     target_model = GraphInferenceEngineTG(max_length=args.M, model_name_or_path=args.target, dtype=torch.float16,
                                           device="cpu", offloading=args.offloading)
-graph_capture_list = [1]
+graph_capture_list = [1, 2]
 draft_model.initialize_graph(graph_capture_list)
 sampling_callables = {args.n_spec: graph_for_sampling_opttree(num_samples=args.n_spec)}
 
