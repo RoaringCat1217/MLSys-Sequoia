@@ -24,7 +24,7 @@ class OPTTree:
         assert self.max_length == draft_model_engine.engine.max_length
         self.draft_model_engine = draft_model_engine
         self.target_model_engine = target_model_engine
-        self.prefill_target = False
+        self.prefill_target = True
         self.sampling_callables = sampling_callables
         self.n_spec = n_spec
         self.eps = eps
@@ -73,7 +73,7 @@ class OPTTree:
             position_ids=position_ids.unsqueeze(0),
             attn_mask=attn_mask[None, None, ...]
         )
-        new_probs, new_tokens = self.sampling_callables[self.n_spec](draft_model_outputs[0, 0])
+        new_probs, new_tokens = self.sampling_callables[self.n_spec](draft_model_outputs[0, -1])
         self.drafted_probs[step] = new_probs.cpu().numpy() * self.drafted_probs[step - 1, 0]
         self.drafted_tokens[step] = new_tokens.cpu().numpy()
         selected_tokens = [(self.drafted_probs[step, j].item(), (step, j)) for j in range(self.n_spec)]
@@ -129,16 +129,16 @@ class OPTTree:
         self.position_ids[self.num_nodes:self.num_nodes + k] = torch.tensor(position_ids[:k], dtype=torch.long, device=self.device)
         tree_mask = torch.tensor(tree_mask[:k, :k], dtype=self.dtype, device=self.device)
         tree_mask = torch.where(tree_mask > 0, 0, torch.finfo(self.dtype).min)
-        attn_mask = torch.full((k, self.num_nodes + k), torch.finfo(self.dtype).min, dtype=self.dtype, device=self.device)
+        attn_mask = torch.full((k + 1, self.num_nodes + k), torch.finfo(self.dtype).min, dtype=self.dtype, device=self.device)
         attn_mask[:, :self.num_nodes] = 0
-        attn_mask[:, self.num_nodes:] = tree_mask
+        attn_mask[1:, self.num_nodes:] = tree_mask
 
         if self.prefill_target:
             # the first call to target
             self.prefill_target = False
             full_attn_mask = torch.full((self.num_nodes + k, self.num_nodes + k), torch.finfo(self.dtype).min, dtype=self.dtype, device=self.device)
             full_attn_mask[:self.num_nodes, :self.num_nodes] = self.attn_mask[:self.num_nodes, :self.num_nodes]
-            full_attn_mask[self.num_nodes:] = attn_mask
+            full_attn_mask[self.num_nodes:] = attn_mask[1:]
             target_model_outputs = self.target_model_engine.inference(
                 input_ids=self.tokens[:self.num_nodes + k].unsqueeze(0),
                 position_ids=self.position_ids[:self.num_nodes + k].unsqueeze(0),
@@ -148,10 +148,10 @@ class OPTTree:
             target_model_outputs = target_model_outputs[0, self.num_nodes - 1:]
         else:
             target_model_outputs = self.target_model_engine.inference(
-                input_ids=self.tokens[self.num_nodes:self.num_nodes + k].unsqueeze(0),
-                position_ids=self.position_ids[self.num_nodes:self.num_nodes + k].unsqueeze(0),
+                input_ids=self.tokens[self.num_nodes - 1:self.num_nodes + k].unsqueeze(0),
+                position_ids=self.position_ids[self.num_nodes - 1:self.num_nodes + k].unsqueeze(0),
                 attn_mask=attn_mask[None, None, ...],
-                storage_ids=self.storage_ids[self.num_nodes:self.num_nodes + k]
+                storage_ids=self.storage_ids[self.num_nodes - 1:self.num_nodes + k]
             )
             target_model_outputs = target_model_outputs[0]
         target_tokens = target_model_outputs.argmax(dim=-1).cpu().numpy()
@@ -182,22 +182,30 @@ class OPTTree:
         self.tokens[self.num_nodes:self.num_nodes + len(accept_tokens)] = torch.tensor(accept_tokens, dtype=torch.long, device=self.device)
         self.position_ids[self.num_nodes:self.num_nodes + len(accept_tokens)] = torch.arange(self.num_nodes, self.num_nodes + len(accept_tokens), dtype=torch.long, device=self.device)
         # consolidate caches
-        indices = np.zeros(self.num_nodes + len(accept_indices), dtype=np.int64)
-        indices[:self.num_nodes] = np.arange(self.num_nodes)
-        indices[self.num_nodes:] = np.array(accept_indices) + self.num_nodes
-        self.draft_model_engine.gather_kv(indices)
-        self.target_model_engine.gather_kv(indices)
+        from_indices = np.array(accept_indices) + self.num_nodes
+        to_indices = np.arange(self.num_nodes, self.num_nodes + len(accept_indices))
+        self.target_model_engine.engine.kv_cache.move_kv_indices(from_indices, to_indices, self.num_nodes + len(accept_indices))
+        matched = 0
+        for k in accept_indices:
+            if k == expand_indices[matched]:
+                matched += 1
+            else:
+                break
+        assert len(accept_indices) - matched in [0, 1]
+        self.draft_model_engine.engine.kv_cache.set_kv_len(self.num_nodes + matched)
         self.num_nodes += len(accept_tokens)
 
         # prepare for the next draft
         if not terminal:
+            # feed the remaining accepted tokens to draft model
+            remain = len(accept_indices) - matched + 1
             draft_model_outputs = self.draft_model_engine.graph_inference(
-                input_ids=self.tokens[-1:].unsqueeze(0),
-                storage_ids=self.storage_ids[-1:],
-                position_ids=position_ids[-1:].unsqueeze(0),
-                attn_mask=self.attn_mask[None, None, self.num_nodes - 1:self.num_nodes]
+                input_ids=self.tokens[self.num_nodes - remain:self.num_nodes].unsqueeze(0),
+                storage_ids=self.storage_ids[self.num_nodes - remain:self.num_nodes],
+                position_ids=self.position_ids[self.num_nodes - remain:self.num_nodes].unsqueeze(0),
+                attn_mask=self.attn_mask[None, None, self.num_nodes - remain:self.num_nodes]
             )
-            probs, tokens = self.sampling_callables[self.n_spec](draft_model_outputs[0, 0])
+            probs, tokens = self.sampling_callables[self.n_spec](draft_model_outputs[0, -1])
             self.drafted_probs[0] = probs.cpu().numpy()
             self.drafted_tokens[0] = tokens.cpu().numpy()
             self.selected_tokens = [(self.drafted_probs[0, j], (0, j)) for j in range(self.n_spec)]
