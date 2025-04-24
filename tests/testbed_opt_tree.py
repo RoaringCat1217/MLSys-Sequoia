@@ -14,7 +14,7 @@ from data_converter import convert_wiki_dataset, convert_cnn_dataset, convert_c4
     convert_qasper_dataset
 import argparse
 import time
-from utils import cuda_graph_for_sampling_argmax
+from utils import cuda_graph_for_sampling_opttree
 from Engine.Engine import GraphInferenceEngine, GraphInferenceEngineTG
 from Engine.offload_engine import OffloadEngine
 import random
@@ -82,7 +82,7 @@ else:
                                           device="cuda:0", offloading=args.offloading)
 graph_capture_list = [1, 2]
 draft_model.initialize_cuda_graph(graph_capture_list)
-sampling_callables = {args.n_spec: cuda_graph_for_sampling_argmax(num_samples=args.n_spec)}
+sampling_callables = {args.n_spec: cuda_graph_for_sampling_opttree(num_samples=args.n_spec)}
 
 accelerator = Accelerator()
 dataloader = accelerator.prepare(dataloader)

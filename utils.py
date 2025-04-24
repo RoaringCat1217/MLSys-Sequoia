@@ -237,12 +237,12 @@ def graph_for_sampling_opttree(num_samples):
     return run
 
 
-def cuda_graph_for_sampling_argmax(num_samples,
+def cuda_graph_for_sampling_opttree(num_samples,
                                    device="cuda:0",
                                    dtype=torch.float16,
                                    vocab_size=32000,
                                    n_warmups=3):
-    static_draft_logits = torch.full(vocab_size, 1, dtype=dtype, device=device)
+    static_draft_logits = torch.full((vocab_size, ), fill_value=1, dtype=dtype, device=device)
 
     s = torch.cuda.Stream()
     s.wait_stream(torch.cuda.current_stream())
