@@ -236,6 +236,36 @@ def graph_for_sampling_opttree(num_samples):
         return probs, tokens
     return run
 
+
+def cuda_graph_for_sampling_argmax(num_samples,
+                                   device="cuda:0",
+                                   dtype=torch.float16,
+                                   vocab_size=32000,
+                                   n_warmups=3):
+    static_draft_logits = torch.full(vocab_size, 1, dtype=dtype, device=device)
+
+    s = torch.cuda.Stream()
+    s.wait_stream(torch.cuda.current_stream())
+    with torch.cuda.stream(s):
+        for _ in range(n_warmups):
+            static_logits, static_tokens = static_draft_logits.topk(num_samples, largest=True, sorted=True)
+            static_probs = torch.nn.functional.softmax(static_logits)
+        s.synchronize()
+    torch.cuda.current_stream().wait_stream(s)
+
+    graph = torch.cuda.CUDAGraph()
+    with torch.cuda.graph(graph):
+        static_logits, static_tokens = static_draft_logits.topk(num_samples, largest=True, sorted=True)
+        static_probs = torch.nn.functional.softmax(static_logits)
+
+    def run(draft_logits):
+        static_draft_logits.copy_(draft_logits)
+        graph.replay()
+        return static_probs.clone(), static_tokens.clone()
+
+    return run
+
+
 def cuda_graph_for_sampling_with_replacement(
                 device="cuda:0", dtype=torch.float16, 
                 dim=32000, max_length=384, 

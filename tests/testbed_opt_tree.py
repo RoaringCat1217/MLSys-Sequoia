@@ -14,8 +14,7 @@ from data_converter import convert_wiki_dataset, convert_cnn_dataset, convert_c4
     convert_qasper_dataset
 import argparse
 import time
-from utils import _make_causal_mask, cuda_graph_for_residual, cuda_graph_for_sampling_argmax, graph_for_residual, \
-    graph_for_sampling_argmax, graph_for_sampling_opttree
+from utils import cuda_graph_for_sampling_argmax
 from Engine.Engine import GraphInferenceEngine, GraphInferenceEngineTG
 from Engine.offload_engine import OffloadEngine
 import random
@@ -74,16 +73,16 @@ data_collator = DataCollatorForLanguageModeling(tokenizer, mlm=False)
 dataloader = DataLoader(tokenized_dataset_eval, batch_size=1, collate_fn=data_collator, shuffle=False)
 
 draft_model = GraphInferenceEngine(max_length=args.M, model_name_or_path=args.model, dtype=torch.float16,
-                                   device="cpu")
+                                   device="cuda:0")
 if args.offloading:
     target_model = OffloadEngine(max_length=args.M, model_name_or_path=args.target, dtype=torch.float16,
                                  device="cuda:0")
 else:
     target_model = GraphInferenceEngineTG(max_length=args.M, model_name_or_path=args.target, dtype=torch.float16,
-                                          device="cpu", offloading=args.offloading)
+                                          device="cuda:0", offloading=args.offloading)
 graph_capture_list = [1, 2]
-draft_model.initialize_graph(graph_capture_list)
-sampling_callables = {args.n_spec: graph_for_sampling_opttree(num_samples=args.n_spec)}
+draft_model.initialize_cuda_graph(graph_capture_list)
+sampling_callables = {args.n_spec: cuda_graph_for_sampling_argmax(num_samples=args.n_spec)}
 
 accelerator = Accelerator()
 dataloader = accelerator.prepare(dataloader)
@@ -109,7 +108,7 @@ with torch.no_grad():
                            target_model_engine=target_model,
                            prefix=input_ids[0],
                            max_length=args.M,
-                           device='cpu',
+                           device='cuda:0',
                            dtype=dtype,
                            sampling_callables=sampling_callables,
                            n_spec=args.n_spec,
