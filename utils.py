@@ -237,7 +237,7 @@ def graph_for_sampling_opttree(num_samples):
     return run
 
 
-def cuda_graph_for_sampling_argmax(num_samples,
+def cuda_graph_for_sampling_opttree(num_samples,
                                    device="cuda:0",
                                    dtype=torch.float16,
                                    vocab_size=32000,
