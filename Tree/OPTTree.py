@@ -66,6 +66,10 @@ class OPTTree:
         position_ids = torch.tensor([num_nodes - 1], device=self.device).long()
         storage_ids = torch.tensor([num_nodes - 1], device=self.device).long()
         attn_mask = self.attn_mask[num_nodes - 1: num_nodes]
+        # print("Self Attn mask shape:", self.attn_mask.shape)
+        # print("Attn mask shape:", attn_mask.shape)
+        # print("Self Num nodes:", self.num_nodes)
+        # print("Num nodes:", num_nodes)
 
         draft_model_outputs = self.draft_model_engine.graph_inference(
             input_ids=tokens.unsqueeze(0),
@@ -85,13 +89,13 @@ class OPTTree:
 
     def draft(self):
         for step in range(1, self.n_spec):
+            if self.num_nodes + step + 1 >= self.max_length:
+                break
             delta = self.draft_step(step)
             if delta < self.eps:
                 break
             # </s> token
             if self.drafted_tokens[step, 0] == 2:
-                break
-            if self.num_nodes + step + 1 >= self.max_length:
                 break
 
     @torch.inference_mode()
@@ -107,11 +111,13 @@ class OPTTree:
             tree[-1].append(k)
             k += 1
         spec_tokens = np.zeros(self.n_spec, dtype=np.int64)
-        tree_mask = np.zeros((self.n_spec, self.n_spec), dtype=np.bool)
+        tree_mask = np.zeros((self.n_spec, self.n_spec), dtype=np.bool_)
         position_ids = np.zeros(self.n_spec, dtype=np.int64)
         expand_indices = [] # the k index of all expanding nodes
         k = 0
         for i, j in coords:
+            if self.num_nodes + k >= self.max_length:
+                break
             spec_tokens[k] = self.drafted_tokens[i, j]
             tree_mask[k, expand_indices[:i]] = True
             tree_mask[k, k] = True
@@ -119,8 +125,6 @@ class OPTTree:
             if j == 0:
                 expand_indices.append(k)
             k += 1
-            if self.num_nodes + k >= self.max_length:
-                break
         position_ids += self.num_nodes
         # now k is the number of nodes
 
@@ -205,6 +209,15 @@ class OPTTree:
                 position_ids=self.position_ids[self.num_nodes - remain:self.num_nodes].unsqueeze(0),
                 attn_mask=self.attn_mask[None, None, self.num_nodes - remain:self.num_nodes]
             )
+            print("Remain:", remain)
+            print("self.num_nodes:", self.num_nodes)
+            print("self.num_nodes - remain:", self.num_nodes - remain)
+            print("self.tokens:", self.tokens.shape)
+            print("input_ids:", self.tokens[self.num_nodes - remain:self.num_nodes].unsqueeze(0).shape)
+            print("Draft model outputs shape:", draft_model_outputs.shape)
+            if draft_model_outputs.shape[1] == 0:
+                print("Draft model outputs is empty")
+                return len(accept_tokens), True
             probs, tokens = self.sampling_callables[self.n_spec](draft_model_outputs[0, -1])
             self.drafted_probs[0] = probs.cpu().numpy()
             self.drafted_tokens[0] = tokens.cpu().numpy()

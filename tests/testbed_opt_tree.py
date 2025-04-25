@@ -1,8 +1,8 @@
 import sys
+sys.path.append("..")
 
 from Tree.OPTTree import OPTTree
 
-sys.path.append("..")
 from transformers import DataCollatorForLanguageModeling, AutoTokenizer
 import torch
 import numpy as np

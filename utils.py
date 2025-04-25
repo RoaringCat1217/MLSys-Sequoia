@@ -242,7 +242,7 @@ def cuda_graph_for_sampling_argmax(num_samples,
                                    dtype=torch.float16,
                                    vocab_size=32000,
                                    n_warmups=3):
-    static_draft_logits = torch.full(vocab_size, 1, dtype=dtype, device=device)
+    static_draft_logits = torch.full((vocab_size,), 1, dtype=dtype, device=device)
 
     s = torch.cuda.Stream()
     s.wait_stream(torch.cuda.current_stream())

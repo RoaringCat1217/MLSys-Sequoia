@@ -159,6 +159,8 @@ def capture_graph(
         static_input_ids.copy_(input_ids)
         static_storage_ids.copy_(storage_ids)
         static_position_ids.copy_(position_ids)
+        # print("Static attn mask shape:", static_attn_mask.shape)
+        # print("Attn mask shape:", attn_mask.shape)
         static_attn_mask.copy_(attn_mask)
         graph.replay()
         return static_logits.clone()
