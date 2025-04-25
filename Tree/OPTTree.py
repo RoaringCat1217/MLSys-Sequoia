@@ -85,13 +85,13 @@ class OPTTree:
 
     def draft(self):
         for step in range(1, self.n_spec):
+            if self.num_nodes + step + 1 >= self.max_length:
+                break
             delta = self.draft_step(step)
             if delta < self.eps:
                 break
             # </s> token
             if self.drafted_tokens[step, 0] == 2:
-                break
-            if self.num_nodes + step + 1 >= self.max_length:
                 break
 
     @torch.inference_mode()
@@ -107,11 +107,13 @@ class OPTTree:
             tree[-1].append(k)
             k += 1
         spec_tokens = np.zeros(self.n_spec, dtype=np.int64)
-        tree_mask = np.zeros((self.n_spec, self.n_spec), dtype=np.bool)
+        tree_mask = np.zeros((self.n_spec, self.n_spec), dtype=np.bool_)
         position_ids = np.zeros(self.n_spec, dtype=np.int64)
         expand_indices = [] # the k index of all expanding nodes
         k = 0
         for i, j in coords:
+            if self.num_nodes + k >= self.max_length:
+                break
             spec_tokens[k] = self.drafted_tokens[i, j]
             tree_mask[k, expand_indices[:i]] = True
             tree_mask[k, k] = True
@@ -119,8 +121,6 @@ class OPTTree:
             if j == 0:
                 expand_indices.append(k)
             k += 1
-            if self.num_nodes + k >= self.max_length:
-                break
         position_ids += self.num_nodes
         # now k is the number of nodes
 
@@ -179,8 +179,15 @@ class OPTTree:
         accept_tokens.append(target_token)
 
         # update
+        if self.max_length - self.num_nodes < len(accept_tokens):
+            accept_tokens = accept_tokens[:self.max_length - self.num_nodes]
+            terminal = True
         self.tokens[self.num_nodes:self.num_nodes + len(accept_tokens)] = torch.tensor(accept_tokens, dtype=torch.long, device=self.device)
         self.position_ids[self.num_nodes:self.num_nodes + len(accept_tokens)] = torch.arange(self.num_nodes, self.num_nodes + len(accept_tokens), dtype=torch.long, device=self.device)
+        if terminal:
+            self.num_nodes += len(accept_tokens)
+            return len(accept_tokens), terminal
+
         # consolidate caches
         from_indices = np.array(accept_indices) + self.num_nodes
         to_indices = np.arange(self.num_nodes, self.num_nodes + len(accept_indices))
@@ -196,19 +203,20 @@ class OPTTree:
         self.num_nodes += len(accept_tokens)
 
         # prepare for the next draft
-        if not terminal:
-            # feed the remaining accepted tokens to draft model
-            remain = len(accept_indices) - matched + 1
-            draft_model_outputs = self.draft_model_engine.graph_inference(
-                input_ids=self.tokens[self.num_nodes - remain:self.num_nodes].unsqueeze(0),
-                storage_ids=self.storage_ids[self.num_nodes - remain:self.num_nodes],
-                position_ids=self.position_ids[self.num_nodes - remain:self.num_nodes].unsqueeze(0),
-                attn_mask=self.attn_mask[None, None, self.num_nodes - remain:self.num_nodes]
-            )
-            probs, tokens = self.sampling_callables[self.n_spec](draft_model_outputs[0, -1])
-            self.drafted_probs[0] = probs.cpu().numpy()
-            self.drafted_tokens[0] = tokens.cpu().numpy()
-            self.selected_tokens = [(self.drafted_probs[0, j], (0, j)) for j in range(self.n_spec)]
-            self.E = sum([x[0] for x in self.selected_tokens])
+        # feed the remaining accepted tokens to draft model
+        remain = len(accept_indices) - matched + 1
+        draft_model_outputs = self.draft_model_engine.graph_inference(
+            input_ids=self.tokens[self.num_nodes - remain:self.num_nodes].unsqueeze(0),
+            storage_ids=self.storage_ids[self.num_nodes - remain:self.num_nodes],
+            position_ids=self.position_ids[self.num_nodes - remain:self.num_nodes].unsqueeze(0),
+            attn_mask=self.attn_mask[None, None, self.num_nodes - remain:self.num_nodes]
+        )
+        if draft_model_outputs.shape[1] == 0:
+            return len(accept_tokens), True
+        probs, tokens = self.sampling_callables[self.n_spec](draft_model_outputs[0, -1])
+        self.drafted_probs[0] = probs.cpu().numpy()
+        self.drafted_tokens[0] = tokens.cpu().numpy()
+        self.selected_tokens = [(self.drafted_probs[0, j], (0, j)) for j in range(self.n_spec)]
+        self.E = sum([x[0] for x in self.selected_tokens])
 
         return len(accept_tokens), terminal
