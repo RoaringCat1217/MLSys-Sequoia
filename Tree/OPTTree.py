@@ -66,10 +66,6 @@ class OPTTree:
         position_ids = torch.tensor([num_nodes - 1], device=self.device).long()
         storage_ids = torch.tensor([num_nodes - 1], device=self.device).long()
         attn_mask = self.attn_mask[num_nodes - 1: num_nodes]
-        # print("Self Attn mask shape:", self.attn_mask.shape)
-        # print("Attn mask shape:", attn_mask.shape)
-        # print("Self Num nodes:", self.num_nodes)
-        # print("Num nodes:", num_nodes)
 
         draft_model_outputs = self.draft_model_engine.graph_inference(
             input_ids=tokens.unsqueeze(0),
@@ -183,8 +179,15 @@ class OPTTree:
         accept_tokens.append(target_token)
 
         # update
+        if self.max_length - self.num_nodes < len(accept_tokens):
+            accept_tokens = accept_tokens[:self.max_length - self.num_nodes]
+            terminal = True
         self.tokens[self.num_nodes:self.num_nodes + len(accept_tokens)] = torch.tensor(accept_tokens, dtype=torch.long, device=self.device)
         self.position_ids[self.num_nodes:self.num_nodes + len(accept_tokens)] = torch.arange(self.num_nodes, self.num_nodes + len(accept_tokens), dtype=torch.long, device=self.device)
+        if terminal:
+            self.num_nodes += len(accept_tokens)
+            return len(accept_tokens), terminal
+
         # consolidate caches
         from_indices = np.array(accept_indices) + self.num_nodes
         to_indices = np.arange(self.num_nodes, self.num_nodes + len(accept_indices))
@@ -200,28 +203,20 @@ class OPTTree:
         self.num_nodes += len(accept_tokens)
 
         # prepare for the next draft
-        if not terminal:
-            # feed the remaining accepted tokens to draft model
-            remain = len(accept_indices) - matched + 1
-            draft_model_outputs = self.draft_model_engine.graph_inference(
-                input_ids=self.tokens[self.num_nodes - remain:self.num_nodes].unsqueeze(0),
-                storage_ids=self.storage_ids[self.num_nodes - remain:self.num_nodes],
-                position_ids=self.position_ids[self.num_nodes - remain:self.num_nodes].unsqueeze(0),
-                attn_mask=self.attn_mask[None, None, self.num_nodes - remain:self.num_nodes]
-            )
-            print("Remain:", remain)
-            print("self.num_nodes:", self.num_nodes)
-            print("self.num_nodes - remain:", self.num_nodes - remain)
-            print("self.tokens:", self.tokens.shape)
-            print("input_ids:", self.tokens[self.num_nodes - remain:self.num_nodes].unsqueeze(0).shape)
-            print("Draft model outputs shape:", draft_model_outputs.shape)
-            if draft_model_outputs.shape[1] == 0:
-                print("Draft model outputs is empty")
-                return len(accept_tokens), True
-            probs, tokens = self.sampling_callables[self.n_spec](draft_model_outputs[0, -1])
-            self.drafted_probs[0] = probs.cpu().numpy()
-            self.drafted_tokens[0] = tokens.cpu().numpy()
-            self.selected_tokens = [(self.drafted_probs[0, j], (0, j)) for j in range(self.n_spec)]
-            self.E = sum([x[0] for x in self.selected_tokens])
+        # feed the remaining accepted tokens to draft model
+        remain = len(accept_indices) - matched + 1
+        draft_model_outputs = self.draft_model_engine.graph_inference(
+            input_ids=self.tokens[self.num_nodes - remain:self.num_nodes].unsqueeze(0),
+            storage_ids=self.storage_ids[self.num_nodes - remain:self.num_nodes],
+            position_ids=self.position_ids[self.num_nodes - remain:self.num_nodes].unsqueeze(0),
+            attn_mask=self.attn_mask[None, None, self.num_nodes - remain:self.num_nodes]
+        )
+        if draft_model_outputs.shape[1] == 0:
+            return len(accept_tokens), True
+        probs, tokens = self.sampling_callables[self.n_spec](draft_model_outputs[0, -1])
+        self.drafted_probs[0] = probs.cpu().numpy()
+        self.drafted_tokens[0] = tokens.cpu().numpy()
+        self.selected_tokens = [(self.drafted_probs[0, j], (0, j)) for j in range(self.n_spec)]
+        self.E = sum([x[0] for x in self.selected_tokens])
 
         return len(accept_tokens), terminal

@@ -1,5 +1,5 @@
 import sys
-sys.path.append("..")
+sys.path.append("/home/ubuntu/MLSys-Sequoia")
 
 from Tree.OPTTree import OPTTree
 
