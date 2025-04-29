@@ -112,3 +112,9 @@ class SpeculatedGraphInferenceEngine:
         self.num_nodes = kv_len
         self.n_read = kv_len
         self.model.set_kv_len(kv_len)
+
+    def initialize_cuda_graph(self, *args, **kwargs):
+        return self.model.initialize_cuda_graph(*args, **kwargs)
+
+    def clear_kv(self):
+        return self.model.clear_kv()

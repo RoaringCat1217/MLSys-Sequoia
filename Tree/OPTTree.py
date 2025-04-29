@@ -21,7 +21,6 @@ class OPTTree:
         self.device = device
         self.dtype = dtype
         self.max_length = max_length
-        assert self.max_length == draft_model_engine.engine.max_length
         self.draft_model_engine = draft_model_engine
         self.target_model_engine = target_model_engine
         self.prefill_target = True
