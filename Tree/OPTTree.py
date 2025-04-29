@@ -199,7 +199,7 @@ class OPTTree:
             else:
                 break
         assert len(accept_indices) - matched in [0, 1]
-        self.draft_model_engine.engine.kv_cache.set_kv_len(self.num_nodes + matched)
+        self.draft_model_engine.set_kv_len(self.num_nodes + matched)
         self.num_nodes += len(accept_tokens)
 
         # prepare for the next draft
