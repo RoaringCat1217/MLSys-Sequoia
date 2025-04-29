@@ -254,6 +254,9 @@ class GraphInferenceEngine:
         return self.engine.model_run(input_ids=input_ids, storage_ids=storage_ids,
                     attention_mask=attn_mask, position_ids=position_ids)
 
+    def set_kv_len(self, kv_len :int):
+        self.engine.kv_cache.set_kv_len(kv_len)
+
 
 class GraphInferenceEngineTG:
     def __init__(self, 
