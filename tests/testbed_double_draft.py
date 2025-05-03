@@ -1,8 +1,8 @@
 import sys
 
+sys.path.append("/root/MLSys-Sequoia")
 from Engine.SpeculatedGraphInferenceEngine import SpeculatedGraphInferenceEngine
 
-sys.path.append("/home/ubuntu/MLSys-Sequoia")
 
 from Tree.OPTTree import OPTTree
 
@@ -79,7 +79,7 @@ dataloader = DataLoader(tokenized_dataset_eval, batch_size=1, collate_fn=data_co
 
 tiny_model = GraphInferenceEngine(max_length=args.M, model_name_or_path=args.tiny_model, dtype=torch.float16, device='cuda:0')
 draft_model = SpeculatedGraphInferenceEngine(tiny_model_engine=tiny_model, spec_steps=args.spec_steps,
-    max_length=args.M, model_name_or_path=args.model, dtype=torch.float16, device="cuda:0")
+    max_length=args.M, model_name_or_path=args.draft_model, dtype=torch.float16, device="cuda:0")
 if args.offloading:
     target_model = OffloadEngine(max_length=args.M, model_name_or_path=args.target, dtype=torch.float16,
                                  device="cuda:0")

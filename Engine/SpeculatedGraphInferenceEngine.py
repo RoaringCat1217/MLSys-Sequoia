@@ -71,6 +71,10 @@ class SpeculatedGraphInferenceEngine:
 
         # verify
         input_ids = input_ids[0].cpu().tolist() + speculated_tokens
+
+        if self.num_nodes + len(input_ids) > self.model.max_length:
+            diff = self.num_nodes + len(input_ids) - self.model.max_length
+            input_ids = input_ids[:len(input_ids) - diff]
         input_ids = torch.tensor(input_ids, dtype=torch.long, device=self.device)
         storage_ids = position_ids = torch.arange(self.num_nodes, self.num_nodes + len(input_ids), device=self.device).long()
         attn_mask = self.attn_mask[self.num_nodes:self.num_nodes + len(input_ids)]
@@ -80,7 +84,7 @@ class SpeculatedGraphInferenceEngine:
                                             attn_mask[None, None])[0]
         ground_truth = logits.argmax(dim=1).cpu().tolist()[n_needed - 1:-1]
         n_accept = 0
-        for i in range(len(speculated_tokens)):
+        for i in range(len(ground_truth)):
             if speculated_tokens[i] == ground_truth[i]:
                 n_accept += 1
             else:
