@@ -1,0 +1,3 @@
+Namespace(model='JackFram/llama-68m', target='TinyLlama/TinyLlama_v1.1', dataset='openwebtext', growmap='../L40_growmaps/68m_13b/growmaps/L40-CNN-68m-13b-greedy.pt', start=0, end=200, T=0.6, P=1.0, seed=17, M=384, S=128, Mode='greedy', offloading=False)
+64
+total time :96.05278s, latency :0.00368s, decoding step: 26134, large model step: 5978, 4.371696219471395
