@@ -1,0 +1,3 @@
+Namespace(model='JackFram/llama-68m', target='meta-llama/Llama-2-13b-hf', dataset='cnn', growmap='../L40_growmaps/68m_13b/growmaps/L40-CNN-68m-13b-greedy.pt', start=0, end=200, T=0.6, P=1.0, seed=17, M=384, S=128, Mode='greedy', offloading=False)
+64
+total time :204.48587s, latency :0.00788s, decoding step: 25960, large model step: 7405, 3.5057393652937203

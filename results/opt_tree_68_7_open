@@ -1,0 +1,2 @@
+Namespace(model='JackFram/llama-68m', target='meta-llama/Llama-2-7b-hf', dataset='openwebtext', start=0, end=200, seed=17, M=384, S=128, offloading=False, n_spec=128, eps=0.1)
+total time :319.90076s, latency :0.00633s, decoding step: 50522, large model step: 16272, 3.10484267453294

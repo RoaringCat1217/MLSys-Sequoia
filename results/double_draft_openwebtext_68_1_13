@@ -1,0 +1,3 @@
+Namespace(draft_model='TinyLlama/TinyLlama_v1.1', tiny_model='JackFram/llama-68m', target='meta-llama/Llama-2-13b-hf', dataset='openwebtext', start=0, end=200, seed=17, M=384, S=128, offloading=False, n_spec=128, spec_steps=6, eps=0.2)
+total time :603.95276s, latency :0.01211s, decoding step: 49871, large model step: 11345, 4.395857205817541
+Namespace(draft_model='meta-llama/Llama-2-7b-hf', tiny_model='JackFram/llama-68m', target='meta-llama/Llama-2-13b-hf', dataset='openwebtext', start=0, end=200, seed=17, M=384, S=128, offloading=False, n_spec=128, spec_steps=6, eps=0.2)

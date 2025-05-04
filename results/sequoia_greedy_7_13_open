@@ -1,0 +1,3 @@
+Namespace(model='meta-llama/Llama-2-7b-hf', target='meta-llama/Llama-2-13b-hf', dataset='openwebtext', growmap='../L40_growmaps/68m_13b/growmaps/L40-CNN-68m-13b-greedy.pt', start=0, end=200, T=0.6, P=1.0, seed=17, M=384, S=128, Mode='greedy', offloading=False)
+64
+total time :376.01070s, latency :0.01458s, decoding step: 25789, large model step: 4255, 6.060869565217391

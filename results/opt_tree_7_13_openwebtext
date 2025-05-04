@@ -1,0 +1,2 @@
+Namespace(model='meta-llama/Llama-2-7b-hf', target='meta-llama/Llama-2-13b-hf', dataset='openwebtext', start=0, end=200, seed=17, M=384, S=128, offloading=False, n_spec=128, eps=0.1)
+total time :980.01159s, latency :0.01965s, decoding step: 49881, large model step: 10260, 4.8616959064327485

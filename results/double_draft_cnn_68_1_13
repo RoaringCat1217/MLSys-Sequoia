@@ -1,0 +1,2 @@
+Namespace(draft_model='TinyLlama/TinyLlama_v1.1', tiny_model='JackFram/llama-68m', target='meta-llama/Llama-2-13b-hf', dataset='cnn', start=0, end=200, seed=17, M=384, S=128, offloading=False, n_spec=128, spec_steps=6, eps=0.2)
+total time :683.61527s, latency :0.01349s, decoding step: 50666, large model step: 11328, 4.47263418079096

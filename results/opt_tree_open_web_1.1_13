@@ -1,0 +1,2 @@
+Namespace(model='TinyLlama/TinyLlama_v1.1', target='meta-llama/Llama-2-13b-hf', dataset='openwebtext', start=0, end=200, seed=17, M=384, S=128, offloading=False, n_spec=128, eps=0.2)
+total time :610.21017s, latency :0.01220s, decoding step: 50000, large model step: 12654, 3.951319740793425

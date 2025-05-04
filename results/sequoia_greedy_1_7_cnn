@@ -1,0 +1,3 @@
+Namespace(model='TinyLlama/TinyLlama_v1.1', target='meta-llama/Llama-2-7b-hf', dataset='cnn', growmap='../L40_growmaps/68m_13b/growmaps/L40-CNN-68m-13b-greedy.pt', start=0, end=200, T=0.6, P=1.0, seed=17, M=384, S=128, Mode='greedy', offloading=False)
+64
+total time :210.08158s, latency :0.00804s, decoding step: 26127, large model step: 4875, 5.359384615384616
