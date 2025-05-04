@@ -1,0 +1,11 @@
+Namespace(draft_model='meta-llama/Llama-2-7b-hf', tiny_model='JackFram/llama-68m', target='meta-llama/Llama-2-13b-hf', dataset='openwebtext', start=0, end=200, seed=17, M=384, S=128, offloading=False, n_spec=128, spec_steps=6, eps=0.2)
+Loading checkpoint shards: 100%|██████████████████████████████████████████████████████████████████████████████████████████████████████| 2/2 [00:39<00:00, 19.97s/it]
+Loading checkpoint shards:   0%|                                                                                                              | 0/3 [00:00<?, ?it/s]
+Loading checkpoint shards: 100%|██████████████████████████████████████████████████████████████████████████████████████████████████████| 3/3 [01:18<00:00, 26.06s/it]
+/root/MLSys-Sequoia/utils.py:252: UserWarning: Implicit dimension choice for softmax has been deprecated. Change the call to include dim=X as an argument.
+  static_probs = torch.nn.functional.softmax(static_logits)
+/root/MLSys-Sequoia/utils.py:259: UserWarning: Implicit dimension choice for softmax has been deprecated. Change the call to include dim=X as an argument.
+  static_probs = torch.nn.functional.softmax(static_logits)
+100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 200/200 [14:35<00:00,  4.38s/it]
+total time :870.67812s, latency :0.01752s, decoding step: 49694, large model step: 9892, 5.023655479175091
+dd 68 7 13 open
